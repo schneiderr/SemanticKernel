@@ -1,0 +1,351 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<style>
+    :root {
+        --bg: #ffffff;
+        --panel: #f6f7f8;
+        --border: #e5e7eb;
+        --text: #0f172a;
+        --muted: #6b7280;
+        --ring: #3b82f6;
+        --btn: #111827;
+        --btn-text: #fff;
+    }
+    @@media (prefers-color-scheme: dark) {
+        : root
+
+    {
+        --bg: #0b0c10;
+        --panel: #14161a;
+        --border: #272a31;
+        --text: #e5e7eb;
+        --muted: #9aa0a6;
+        --ring: #60a5fa;
+        --btn: #2563eb;
+        --btn-text: #f8fafc;
+    }
+
+    }
+
+    html, body {
+        height: 100%;
+    }
+
+    body {
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    /* Sticky footer container */
+    .chat-input-wrap {
+        position: sticky;
+        bottom: 0;
+        width: 100%;
+        background: linear-gradient(to top, var(--bg) 65%, transparent);
+        padding: 16px 12px 24px;
+    }
+
+    /* Center column like ChatGPT */
+    @@media (min-width: 640px) {
+        .chat-input-wrap
+
+    {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    }
+    @@media (min-width: 768px) {
+        .chat-input-wrap
+
+    {
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    }
+    @@media (min-width: 1024px) {
+        .chat-input-wrap
+
+    {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .chat-input, .chat-hints {
+        max-width: 800px;
+        width: 100%;
+    }
+
+    }
+
+    /* The input pill */
+    .chat-input {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        padding: 10px;
+        border-radius: 2rem; /* pill look */
+        box-shadow: 0 6px 24px rgba(0,0,0,.06);
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+        /* Focus ring (when textarea focused) */
+        .chat-input:has(textarea:focus) {
+            border-color: color-mix(in oklab, var(--ring), white 30%);
+            box-shadow: 0 0 0 4px color-mix(in oklab, var(--ring) 30%, transparent);
+        }
+
+    .icon-btn {
+        border: 0;
+        background: transparent;
+        padding: 8px;
+        border-radius: 10px;
+        color: var(--muted);
+        cursor: pointer;
+    }
+
+        .icon-btn:hover {
+            background: rgba(0,0,0,.05);
+        }
+    @@media (prefers-color-scheme: dark) {
+        .icon-btn:hover
+
+    {
+        background: rgba(255,255,255,.06);
+    }
+
+    }
+
+    /* Textarea */
+    .chat-textarea {
+        flex: 1;
+        resize: none;
+        max-height: 40vh; /* stop runaway growth */
+        min-height: 24px;
+        line-height: 1.45;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        padding: 8px 0;
+        /* prevent layout shift */
+        overflow: auto;
+        white-space: pre-wrap; /* preserve line breaks & wrap long lines */
+        font-family: ui-monospace, monospace; /* optional: better for aligned spacing */
+    }
+
+    /* Send button */
+    .send-btn {
+        flex: 0 0 auto;
+        border: 0;
+        background: var(--btn);
+        color: var(--btn-text);
+        padding: 10px 14px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: opacity .15s ease, transform .05s ease-in-out;
+    }
+
+        .send-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .send-btn:active {
+            transform: translateY(1px);
+        }
+
+    /* Under-bar hints */
+    .chat-hints {
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        text-align: center;
+    }
+
+    kbd {
+/*         background: var(--panel); */
+        border: 1px solid var(--border);
+        border-bottom-width: 2px;
+        padding: 0 6px;
+        border-radius: 6px;
+        font-family: ui-monospace,SFMono-Regular,Menlo,monospace;
+    }
+
+    .chat-assistant-output {
+        display: flex;
+        align-items: flex-start;
+        flex-direction: column;
+        width: 100%;
+    }
+
+        .chat-assistant-output .prompt {
+            background: var(--panel);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, .06);
+            white-space: pre-wrap;
+            width: 75% !important;
+            padding: 5px 12px;
+        }
+
+    .chat-user-input {
+        display: flex;
+        align-items: flex-end;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .chat-user-input .prompt {
+        background: var(--panel);
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, .06);
+        white-space: pre-wrap;
+        width: 50%;
+        padding: 5px 12px;
+    }
+
+</style>
+
+<div class="container">
+    <div class="d-flex flex-column align-items-center">
+        <div class="">
+            <h1 class="display-4">Ask anything..</h1>
+        </div>
+
+        <div class="w-75">
+            <div id="out" class="d-flex flex-column gap-4 mb-3" aria-live="polite" aria-atomic="false">
+                <!-- Chat messages will be appended here -->
+@*                 <div class="chat-assistant-output">
+                    Hello! How can I assist you today?
+                </div> *@
+
+@*                 <div class="chat-user-input">
+                    <div class="p-2" style="background: var(--panel)">Hello! Can you teach me jquery?</div>
+                </div> *@
+
+
+            </div>
+        </div>
+
+
+        <div class="w-75">
+            <!-- Chat Input -->
+            <div class="chat-input-wrap" role="group" aria-label="Chat composer">
+                <div class="chat-input">
+                    <button class="icon-btn" type="button" title="Attach file" aria-label="Attach file">
+                        <!-- paperclip -->
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M16.5 6.5l-7.78 7.78a3 3 0 104.24 4.24l7.78-7.78a5 5 0 10-7.07-7.07L5.1 12.24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    </button>
+
+                    <textarea id="prompt-textarea"
+                              class="chat-textarea"
+                              rows="1"
+                              placeholder="Message ChatGPT…"
+                              aria-label="Message"></textarea>
+
+                    <button class="send-btn" type="button" id="sendBtn" aria-label="Send message">
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12l16-7-7 16-2-7-7-2z" fill="currentColor" /></svg>
+                    </button>
+                </div>
+
+                <div class="chat-hints">
+                    Press <kbd>Enter</kbd> to send • <kbd>Shift</kbd>+<kbd>Enter</kbd> for new line
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+
+
+@section Scripts {
+    <script>
+
+        let conversationMessageCounter = 0;
+        var SUBMIT_BTN_SELECTOR = 'sendBtn'
+        var PROMPT_TEXTAREA_SELECTOR = 'prompt-textarea';
+        var HISTORY_SELECTOR = "#out"
+
+        $(function () {
+            const ta = document.getElementById(PROMPT_TEXTAREA_SELECTOR);
+            const send = document.getElementById(SUBMIT_BTN_SELECTOR);
+
+            function autosize() {
+                ta.style.height = '0px';
+                ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + 'px';
+                send.disabled = !ta.value.trim();
+            }
+
+            ta.addEventListener('input', autosize);
+            window.addEventListener('resize', autosize);
+            autosize();
+
+              // Enter to send, Shift+Enter for newline
+            ta.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!send.disabled) send.click();
+                }
+            });
+
+            send.addEventListener('click', () => {
+
+                const p = ta.value.trim();
+
+                ta.value = "";
+
+                const $out = $(HISTORY_SELECTOR);
+
+                var $assistanceResponse = $('<pre>', {class: 'chat-assistant-output' }).append(
+                    $("<div>", { id: conversationMessageCounter, class: "prompt" })
+                );
+
+                var $userMessage = $("<div>", { class: "chat-user-input" }).append(
+                    $("<div>", { class: "prompt", text: p })
+                );
+
+                $($out).append($userMessage);
+                $($out).append($assistanceResponse);
+
+                console.log('Send:', p);
+
+                const response = document.getElementById(conversationMessageCounter);
+                const es = new EventSource(`/api/chat?prompt=${p}`);    
+                es.onmessage = (e) => {
+
+                    if (e.data === "[DONE]") {
+                        es.close();
+                        conversationMessageCounter++;
+                        return;
+                    }
+                    try {
+                        const { delta } = JSON.parse(e.data);
+                        response.textContent += delta;
+                    } 
+                    catch { /* ignore comments/pings */ }
+                };
+                es.onerror = () => es.close();
+
+                autosize();
+            });
+        });
+
+
+    </script>
+}
