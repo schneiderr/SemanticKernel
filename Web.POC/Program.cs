@@ -6,10 +6,14 @@ builder.Configuration
     .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
 builder.Services.AddAppServices(builder.Configuration);
+builder.Services.AddMemoryCache();
+builder.Services.AddSession();
 
 var mvc = builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+app.UseSession();
 
 // typical middleware
 if (!app.Environment.IsDevelopment())

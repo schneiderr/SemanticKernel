@@ -1,7 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
+using System.Text;
 using System.Text.Json;
+using AICore.Models;
 
 namespace Web.POC.Controllers
 {
@@ -10,18 +14,32 @@ namespace Web.POC.Controllers
     {
         private readonly Kernel _kernel;
         private readonly IChatCompletionService _chat;
+        private readonly IMemoryCache _cache;
 
-        public ChatController(Kernel kernel)
+        // Define available tools (customize as needed)
+        const string availableTools = "Available tools:\n- gh.ListIssuesAsync(repo)\n- time.NowIso8601\n";
+
+        public ChatController(Kernel kernel, IMemoryCache cache)
         {
             _kernel = kernel;
             // retrieve the chat completion service registered with the kernel
             _chat = _kernel.GetRequiredService<IChatCompletionService>();
+            _cache = cache;
         }
 
         // GET /api/stream?prompt=hello
         [HttpGet]
         public async Task Get([FromQuery] string prompt, CancellationToken ct)
         {
+
+            // Ensure session ID exists
+            var sessionId = HttpContext.Session.GetString("ChatSessionId");
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                sessionId = Guid.NewGuid().ToString();
+                HttpContext.Session.SetString("ChatSessionId", sessionId);
+            }
+
             Response.ContentType = "text/event-stream; charset=utf-8";
             Response.Headers.CacheControl = "no-cache, no-transform";
             Response.Headers["X-Accel-Buffering"] = "no";
@@ -30,35 +48,128 @@ namespace Web.POC.Controllers
             await Response.WriteAsync(": connected\n\n", ct);
             await Response.Body.FlushAsync(ct);
 
-            // build the chat (system + user)
-            var chat = new ChatHistory();
-            chat.AddSystemMessage("You are a concise assistant. Stream partial tokens promptly.");
-            chat.AddUserMessage(prompt);
+            // Retrieve or create chat session from cache
+            ChatSession chatSession;
+            if (!_cache.TryGetValue(sessionId, out chatSession))
+            {
+                chatSession = new ChatSession { Id = Guid.Parse(sessionId) };
+                chatSession.Messages.Add(new ChatMessage
+                {
+                    Id = Guid.NewGuid(),
+                    SessionId = chatSession.Id,
+                    Role = "system",
+                    Content = "You are a concise assistant. Stream partial tokens promptly.\n" + availableTools,
+                    CreatedUtc = DateTime.UtcNow
+                });
 
-            //// request settings (tune as needed)
-            //var settings = new ChatRequestSettings
-            //{
-            //    Temperature = 0.3,
-            //    TopP = 0.95,
-            //    // MaxOutputTokenCount = 1024, // optional
-            //};
+                _cache.Set(sessionId, chatSession);
+            }
+
+            // Add user message to session
+            chatSession.Messages.Add(new ChatMessage
+            {
+                Id = Guid.NewGuid(),
+                SessionId = chatSession.Id,
+                Role = "user",
+                Content = prompt,
+                CreatedUtc = DateTime.UtcNow
+            });
+
+            // Build chat history for SK
+            var chat = new ChatHistory();
+            foreach (var msg in chatSession.Messages)
+            {
+                if (msg.Role == "user") chat.AddUserMessage(msg.Content);
+                else if (msg.Role == "assistant") chat.AddAssistantMessage(msg.Content);
+                else if (msg.Role == "system") chat.AddSystemMessage(msg.Content);
+            }
 
             // stream tokens from SK
-            await foreach (var chunk in _chat.GetStreamingChatMessageContentsAsync(chat, kernel: _kernel, cancellationToken: ct)
+            var settings = new OpenAIPromptExecutionSettings { ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions };
+
+            // Accumulate streamed tokens
+            var assistantResponseBuilder = new StringBuilder();
+            await foreach (var chunk in _chat.GetStreamingChatMessageContentsAsync(chat, executionSettings: settings, kernel: _kernel, cancellationToken: ct)
                 .WithCancellation(ct))
             {
-                // chunk.Content is the partial text; some providers also set Role/Metadata
                 if (!string.IsNullOrEmpty(chunk.Content))
                 {
+                    assistantResponseBuilder.Append(chunk.Content);
                     var json = JsonSerializer.Serialize(new { delta = chunk.Content });
                     await Response.WriteAsync($"data: {json}\n\n", ct);
                     await Response.Body.FlushAsync(ct);
                 }
             }
 
+            // Add assistant message to session with full streamed response
+            var assistantResponse = assistantResponseBuilder.ToString();
+            if(string.IsNullOrWhiteSpace(assistantResponse))
+            {
+                chatSession.Messages.Add(new ChatMessage
+                {
+                    Id = Guid.NewGuid(),
+                    SessionId = chatSession.Id,
+                    Role = "assistant",
+                    Content = assistantResponseBuilder.ToString(),
+                    CreatedUtc = DateTime.UtcNow
+                });
+            }
+
+            _cache.Set(sessionId, chatSession);
+
             // done marker (ChatGPT-like)
             await Response.WriteAsync("data: [DONE]\n\n", ct);
             await Response.Body.FlushAsync(ct);
+        }
+
+        [HttpGet, Route("[controller]/peek/history")]
+        public async Task<IActionResult> PeakHistory([FromQuery] string prompt, CancellationToken ct)
+        {
+            // Ensure session ID exists
+            var sessionId = HttpContext.Session.GetString("ChatSessionId");
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                sessionId = Guid.NewGuid().ToString();
+                HttpContext.Session.SetString("ChatSessionId", sessionId);
+            }
+
+            // Retrieve or create chat session from cache
+            ChatSession chatSession;
+            if (!_cache.TryGetValue(sessionId, out chatSession))
+            {
+                chatSession = new ChatSession { Id = Guid.NewGuid() };
+                chatSession.Messages.Add(new ChatMessage
+                {
+                    Id = Guid.NewGuid(),
+                    SessionId = chatSession.Id,
+                    Role = "system",
+                    Content = "You are a concise assistant. Stream partial tokens promptly.\n" + availableTools,
+                    CreatedUtc = DateTime.UtcNow
+                });
+
+                _cache.Set(sessionId, chatSession);
+            }
+
+            // Add user message to session
+            chatSession.Messages.Add(new ChatMessage
+            {
+                Id = Guid.NewGuid(),
+                SessionId = chatSession.Id,
+                Role = "user",
+                Content = prompt,
+                CreatedUtc = DateTime.UtcNow
+            });
+
+            // Build chat history for SK
+            var chat = new ChatHistory();
+            foreach (var msg in chatSession.Messages)
+            {
+                if (msg.Role == "user") chat.AddUserMessage(msg.Content);
+                else if (msg.Role == "assistant") chat.AddAssistantMessage(msg.Content);
+                else if (msg.Role == "system") chat.AddSystemMessage(msg.Content);
+            }
+
+            return new JsonResult(new { history = chat });
         }
     }
 }
