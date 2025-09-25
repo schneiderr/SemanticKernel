@@ -58,7 +58,7 @@ namespace Web.POC.Controllers
                     Id = Guid.NewGuid(),
                     SessionId = chatSession.Id,
                     Role = "system",
-                    Content = "You are a concise assistant. Stream partial tokens promptly.\n" + availableTools,
+                    Content = "You are a concise assistant. Stream partial tokens in markdown promptly.\n" + availableTools,
                     CreatedUtc = DateTime.UtcNow
                 });
 
@@ -103,7 +103,7 @@ namespace Web.POC.Controllers
 
             // Add assistant message to session with full streamed response
             var assistantResponse = assistantResponseBuilder.ToString();
-            if(string.IsNullOrWhiteSpace(assistantResponse))
+            if(!string.IsNullOrWhiteSpace(assistantResponse))
             {
                 chatSession.Messages.Add(new ChatMessage
                 {
